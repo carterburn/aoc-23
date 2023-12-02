@@ -1,0 +1,1 @@
+Consider coming back and doing a sliding window technique to pull out the spelled out numbers
