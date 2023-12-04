@@ -1,5 +1,2 @@
 target/
 Cargo.lock
-input.txt
-test1.txt
-test2.txt
