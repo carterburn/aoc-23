@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::collections::VecDeque;
 use std::error::Error;
 
@@ -97,24 +98,69 @@ impl Almanac {
     }
 
     /// Use init seeds as a range instead of the starting points
-    pub fn init_seed_range(&self) -> u64 {
-        let mut loc_min = u64::MAX;
-
+    pub fn part2(&self) -> Option<(u64, u64)> {
+        // start by making a set of ranges to start with
+        let mut init_ranges = vec![];
         for chunk in self.init_seeds.chunks(2) {
-            println!("Processing Init Seed Chunk: {chunk:?}");
-            if chunk.len() != 2 {
-                break;
-            }
+            init_ranges.push((chunk[0], chunk[1]));
+        }
 
-            // see if this is the new min
-            for i in chunk[0]..chunk[0] + chunk[1] {
-                let c = self.get_conversion(i);
-                if c < loc_min {
-                    loc_min = c;
+        // for each of the ranges, output the min values from that translation
+        init_ranges = Almanac::map_ranges(init_ranges, &self.seed_soil);
+        init_ranges = Almanac::map_ranges(init_ranges, &self.soil_fert);
+        init_ranges = Almanac::map_ranges(init_ranges, &self.fert_water);
+        init_ranges = Almanac::map_ranges(init_ranges, &self.water_light);
+        init_ranges = Almanac::map_ranges(init_ranges, &self.light_temp);
+        init_ranges = Almanac::map_ranges(init_ranges, &self.temp_humid);
+        init_ranges = Almanac::map_ranges(init_ranges, &self.humid_loc);
+
+        init_ranges.iter().min_by_key(|x| x.0).copied()
+    }
+
+    pub fn map_ranges(mut init_ranges: Vec<(u64, u64)>, map: &AlMap) -> Vec<(u64, u64)> {
+        // vec to store the eventual results for this mapping
+        let mut final_ranges: Vec<(u64, u64)> = vec![];
+
+        // process ranges until we run out in init_ranges
+        while let Some(src_rng) = init_ranges.pop() {
+            // for each of this map's translations, we need to determine if there is a range that
+            // overlaps
+            // need to keep track if we find an overlap for the given range (if not, then we just
+            // add the identity mapping to final_ranges
+            let mut overlap_found = false;
+            for translation in &map.ranges {
+                // overlaps for the src_rng (from init_ranges) and the rng (from the map
+                // translation)
+                let overlap_start = max(src_rng.0, translation.source_start);
+                let overlap_end = min(
+                    src_rng.0 + src_rng.1,
+                    translation.source_start + translation.range_len as u64,
+                );
+
+                // if we have an overlap, then we can put that whole range in final_ranges
+                if overlap_start < overlap_end {
+                    // range that moves on is starting
+                    final_ranges.push((
+                        overlap_start - translation.source_start + translation.dest_start,
+                        overlap_end - overlap_start,
+                    ));
+                    // check to see if there are leftovers from the source rang
+                    if src_rng.0 < overlap_start {
+                        init_ranges.push((src_rng.0, overlap_start - src_rng.0));
+                    }
+                    if overlap_end < src_rng.0 + src_rng.1 {
+                        init_ranges.push((overlap_end, (src_rng.0 + src_rng.1) - overlap_end));
+                    }
+                    overlap_found = true;
+                    break;
                 }
             }
+            if !overlap_found {
+                // add identity mapping
+                final_ranges.push(src_rng);
+            }
         }
-        loc_min
+        final_ranges
     }
 }
 
@@ -217,9 +263,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // for part 2, we should convert the init seeds to a larger vec and then re-run
     // get_conversions()
-    let p2convert = alm.init_seed_range();
-
-    println!("Part 2: {}", p2convert);
+    match alm.part2() {
+        None => println!("Error finding location for part 2!"),
+        Some(min_loc) => println!("Part 2: {:?}", min_loc.0),
+    };
 
     Ok(())
 }
