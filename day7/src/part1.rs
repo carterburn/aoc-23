@@ -159,57 +159,30 @@ impl<'a> Hand<'a> {
         ))
     }
 
-    pub fn with_joker(&mut self) {
-        // get a string chunking again for decision making on upgrades
-        let chunks = chunk_string(self.cards);
-        let num_jokers = match chunks.get(&'J') {
-            None => {
-                return;
-            }
-            Some(v) => *v,
-        };
-
-        // if there is a joker, try to upgrade the hand type
-        self.hand_type = match self.hand_type {
-            HandType::FiveOfAKind => {
-                // still have a five of a kind
-                HandType::FiveOfAKind
-            }
-            HandType::FourOfAKind => {
-                // can always upgrade to a five of a kind
-                HandType::FiveOfAKind
-            }
-            HandType::FullHouse => {
-                // either situations give a five of a kind (either have 3 jokers 2 others to
-                // upgrade to 5 or 2 jokers 3 others to upgrade to 5)
-                HandType::FiveOfAKind
-            }
-            HandType::ThreeOfAKind => {
-                // three of a kind means we can use the joker to upgrade to a foure of a kind (no
-                // matter how many jokers; either have 3 jokers that can turn to 3 of one of the
-                // remaining or 1 joker that can be either or)
-                HandType::FourOfAKind
-            }
-            HandType::TwoPair => {
-                if num_jokers == 2 {
-                    // 2 jokers can move to the other pair and become a four of a kind
-                    HandType::FourOfAKind
-                } else {
-                    // 1 joker can upgrade one of the two pairs to make the whole thing a fullhouse
-                    HandType::FullHouse
-                }
-            }
-            HandType::OnePair => {
-                // the joker may be the pair (so you can match another one of the leftovers for
-                // three) or the joker is alone and NOT the pair, so it can match the pair for a
-                // three of a kind
-                HandType::ThreeOfAKind
-            }
-            HandType::HighCard => {
-                // best you can do is turn the joker into a pair
-                HandType::OnePair
-            }
-        };
+    /// Converts a card to a numerical representation for easier comparison
+    pub fn card_value(&self) -> i32 {
+        // assign a card value to each of the cards, a larger number means a 'stronger' card (or >)
+        self.cards.chars().fold(0, |mut acc, x| {
+            let cval = match x {
+                '2' => 2,
+                '3' => 3,
+                '4' => 4,
+                '5' => 5,
+                '6' => 6,
+                '7' => 7,
+                '8' => 8,
+                '9' => 9,
+                'T' => 10,
+                'J' => 11,
+                'Q' => 12,
+                'K' => 13,
+                'A' => 14,
+                _ => 0,
+            };
+            // multiply by 100 to ensure we have distinct values
+            acc = acc * 100 + cval;
+            acc
+        })
     }
 }
 
@@ -220,41 +193,14 @@ impl<'a> Ord for Hand<'a> {
     /// self is Greater than other.
     fn cmp(&self, other: &Self) -> Ordering {
         // check if there are different HandTypes; if yes, go based on that
-        if self.hand_type.cmp(&other.hand_type).is_ne() {
+        if self.hand_type != other.hand_type {
             return self.hand_type.cmp(&other.hand_type);
         }
 
         // otherwise, need to compare the cards one by one
-        let scards = self.cards.chars().collect::<Vec<char>>();
-        let ocards = other.cards.chars().collect::<Vec<char>>();
-        // define the order we care about
-        let char_order = [
-            'J', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'Q', 'K', 'A',
-        ];
-
-        for (sc, oc) in scards.iter().zip(ocards.iter()) {
-            // same cards don't matter
-            if sc == oc {
-                continue;
-            }
-
-            // get the indices of the two cards, compare those
-            let scind = match char_order.iter().position(|&p| p == *sc) {
-                None => {
-                    return Ordering::Less;
-                }
-                Some(s) => s,
-            };
-            let ocind = match char_order.iter().position(|&p| p == *oc) {
-                None => {
-                    return Ordering::Greater;
-                }
-                Some(o) => o,
-            };
-            return scind.cmp(&ocind);
-        }
-        // based on the input, can't get here; but need it because rust
-        Ordering::Equal
+        let scard = self.card_value();
+        let ocard = other.card_value();
+        scard.cmp(&ocard)
     }
 }
 
@@ -266,7 +212,7 @@ impl<'a> PartialOrd for Hand<'a> {
 
 impl<'a> PartialEq for Hand<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.hand_type == other.hand_type && self.cards == other.cards
+        self.hand_type == other.hand_type && self.card_value() == other.card_value()
     }
 }
 
@@ -279,7 +225,7 @@ impl<'a> CamelCards<'a> {
     pub fn parse(input: &'a str) -> IResult<&str, Self> {
         let (remain, mut cards) = many0(preceded(multispace0, Hand::parse))(input)?;
         // sort immediately
-        //cards.sort();
+        cards.sort();
         Ok((remain, Self { cards }))
     }
 
@@ -290,17 +236,6 @@ impl<'a> CamelCards<'a> {
             .map(|(rank, hand)| ((rank + 1) as i32) * hand.bid)
             .sum()
     }
-
-    pub fn with_joker(&mut self) -> i32 {
-        // transform each card with a joker if applicable
-        for c in self.cards.iter_mut() {
-            c.with_joker();
-        }
-        // sort the cards based on updates
-        self.cards.sort();
-        // compute new value
-        self.total_winnings()
-    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -308,12 +243,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let input = include_str!("../input.txt");
 
     // begin by parsing the cards and their bids
-    let (_remaining, mut camel_cards) = CamelCards::parse(input)?;
+    let (_remaining, camel_cards) = CamelCards::parse(input)?;
 
-    let p2 = camel_cards.with_joker();
-    println!("{:?}", camel_cards.cards);
+    let p1 = camel_cards.total_winnings();
 
-    println!("P2: {p2}");
+    println!("P1: {p1}");
 
     Ok(())
 }
