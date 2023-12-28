@@ -1,6 +1,7 @@
+use anyhow::anyhow;
+use anyhow::Error;
 use std::collections::HashMap;
 use std::env;
-use std::error::Error;
 use std::fs;
 
 use nom::{
@@ -14,6 +15,24 @@ use nom::{
     sequence::separated_pair,
     IResult,
 };
+
+#[derive(Debug, Clone)]
+struct StepParsingError;
+
+#[derive(Debug, Clone)]
+struct MapParsingError;
+
+impl std::fmt::Display for StepParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "invalid step parsing")
+    }
+}
+
+impl std::fmt::Display for MapParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "invalid map parsing")
+    }
+}
 
 #[derive(Debug, Clone)]
 enum Step {
@@ -105,18 +124,16 @@ fn map_parser(input: &str) -> IResult<&str, HashMap<String, (String, String)>> {
     Ok((remain, mapping))
 }
 
-fn parse(input: &str) -> Result<Map, Box<dyn Error>> {
+fn parse(input: &str) -> Result<Map, Error> {
     let (remain, steps) = match step_parser(input) {
         Err(_) => {
-            // TODO: change these to custom error types eventually
-            return Err(Box::new(std::io::Error::from_raw_os_error(9)));
+            return Err(anyhow!("Step parsing error"));
         }
         Ok((r, s)) => (r, s),
     };
     let (_remain, map) = match map_parser(remain) {
         Err(_) => {
-            // TODO: see TODO on 123
-            return Err(Box::new(std::io::Error::from_raw_os_error(9)));
+            return Err(anyhow!("Map Parsing error"));
         }
         Ok((r, m)) => (r, m),
     };
@@ -127,7 +144,7 @@ fn parse(input: &str) -> Result<Map, Box<dyn Error>> {
     })
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
 
     let choice = match args.get(1) {
@@ -138,6 +155,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let filename = match choice {
         "1" => "test1.txt",
         "2" => "test2.txt",
+        "3" => "test3.txt",
         "i" | "I" => "input.txt",
         _ => panic!("invalid choice: 1, 2, i/I"),
     };
