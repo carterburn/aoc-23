@@ -2,30 +2,6 @@ use std::env;
 use std::error::Error;
 use std::fs;
 
-fn _compute_result(l: Vec<i64>) -> i64 {
-    let last_value = l[l.len() - 1];
-
-    // compute the differences between each value
-    let mut diffs = Vec::new();
-    // be efficient to see if we have all zeros
-    let mut zeros = true;
-    for i in 1..l.len() {
-        let d = l[i] - l[i - 1];
-        if d != 0 {
-            zeros = false;
-        }
-        diffs.push(d);
-    }
-
-    // if we have all zeros, it's time to move up (just return last value because it'll just add to
-    // 0)
-    if zeros {
-        last_value
-    } else {
-        last_value + compute_result(diffs)
-    }
-}
-
 fn compute_result(l: Vec<i64>) -> i64 {
     let first_value = l[0];
 
