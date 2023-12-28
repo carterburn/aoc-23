@@ -51,13 +51,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             .collect::<Result<Vec<i64>, _>>()?;
 
         // compute what the result will be for this line
-        let l_res = compute_result(l);
-        println!("Line Result: {l_res}");
-        result += l_res;
-        //result += compute_result(l);
+        result += compute_result(l);
     }
 
-    println!("P1: {result}");
+    println!("P2: {result}");
 
     Ok(())
 }
